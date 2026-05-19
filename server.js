@@ -46,6 +46,7 @@ app.use(express.json({ limit: '256kb' }));
 app.use((req, res, next) => {
   const origin = req.headers.origin || '';
   const allow = [
+    'https://courses.coreviaflow.space',
     'https://olx.coreviaflow.space',
     'https://crm.coreviaflow.space',
     'https://olx-autopilot.com.ua',
