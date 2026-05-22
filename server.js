@@ -46,6 +46,9 @@ app.use(express.json({ limit: '256kb' }));
 app.use((req, res, next) => {
   const origin = req.headers.origin || '';
   const allow = [
+    'https://sl-claw.tech',
+    'https://www.sl-claw.tech',
+    'https://pay.sl-claw.tech',
     'https://courses.coreviaflow.space',
     'https://olx.coreviaflow.space',
     'https://crm.coreviaflow.space',
