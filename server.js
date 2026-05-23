@@ -34,6 +34,21 @@ const API_VERSION = process.env.FACEBOOK_API_VERSION || 'v21.0';
 const EVENTS_SECRET = process.env.EVENTS_SECRET || ''; // shared secret для server-to-server
 const TEST_EVENT_CODE = process.env.META_TEST_EVENT_CODE || ''; // встановити поки тестуємо
 
+// ── Multi-pixel: кожен сайт шле свій pixel_id. courses → старий, sl-claw → новий.
+// Мапа pixel_id → token. Якщо для pixel свого токена нема — fallback на ACCESS_TOKEN.
+// SLCLAW_PIXEL_ID / SLCLAW_CAPI_TOKEN — для sl-claw.tech (окремий pixel).
+const SLCLAW_PIXEL_ID = process.env.SLCLAW_PIXEL_ID || '1303860444646281';
+const SLCLAW_CAPI_TOKEN = process.env.SLCLAW_CAPI_TOKEN || '';
+const PIXEL_TOKENS = { [PIXEL_ID]: ACCESS_TOKEN };
+if (SLCLAW_PIXEL_ID && SLCLAW_CAPI_TOKEN) PIXEL_TOKENS[SLCLAW_PIXEL_ID] = SLCLAW_CAPI_TOKEN;
+const ALLOWED_PIXELS = Object.keys(PIXEL_TOKENS);
+
+// Резолвимо pixel + token із запиту. Невідомий pixel → дефолтний (старий).
+function resolvePixel(reqPixelId) {
+  const pid = reqPixelId && ALLOWED_PIXELS.includes(String(reqPixelId)) ? String(reqPixelId) : PIXEL_ID;
+  return { pixelId: pid, token: PIXEL_TOKENS[pid] || ACCESS_TOKEN };
+}
+
 if (!ACCESS_TOKEN) {
   console.error('FATAL: FACEBOOK_CAPI_TOKEN не встановлено');
   process.exit(1);
@@ -87,11 +102,13 @@ function buildUserData(req, body) {
   return ud;
 }
 
-async function pushToMeta(events) {
-  const url = `https://graph.facebook.com/${API_VERSION}/${PIXEL_ID}/events`;
+async function pushToMeta(events, pixelId, token) {
+  const pid = pixelId || PIXEL_ID;
+  const tok = token || ACCESS_TOKEN;
+  const url = `https://graph.facebook.com/${API_VERSION}/${pid}/events`;
   const payload = { data: events };
   if (TEST_EVENT_CODE) payload.test_event_code = TEST_EVENT_CODE;
-  payload.access_token = ACCESS_TOKEN;
+  payload.access_token = tok;
 
   const res = await fetch(url, {
     method: 'POST',
@@ -146,8 +163,9 @@ app.post('/v1/track', async (req, res) => {
       custom_data: body.custom_data || {},
     };
 
-    const result = await pushToMeta([event]);
-    res.json({ ok: true, result });
+    const { pixelId, token } = resolvePixel(body.pixel_id);
+    const result = await pushToMeta([event], pixelId, token);
+    res.json({ ok: true, pixel: pixelId, result });
   } catch (err) {
     console.error('CAPI error:', err.message);
     res.status(500).json({ error: err.message });
@@ -171,8 +189,9 @@ app.post('/v1/track-batch', async (req, res) => {
       user_data: buildUserData(req, b),
       custom_data: b.custom_data || {},
     }));
-    const result = await pushToMeta(events);
-    res.json({ ok: true, count: events.length, result });
+    const { pixelId, token } = resolvePixel(req.body?.pixel_id);
+    const result = await pushToMeta(events, pixelId, token);
+    res.json({ ok: true, count: events.length, pixel: pixelId, result });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
