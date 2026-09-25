@@ -1,0 +1,12 @@
+# Прод: corevia-vps, /opt/events-coreviaflow. Деплой: git pull && docker compose up -d --build
+# Секреты — в .env рядом (не в git), образец — .env.example.
+# nginx (events.coreviaflow.space) проксирует на 127.0.0.1:8120 — постоянный адрес,
+# в отличие от Coolify, где IP контейнера менялся при каждой выкатке и сайт отдавал 502.
+services:
+  events:
+    build: .
+    container_name: events-coreviaflow
+    env_file: .env
+    ports:
+      - "127.0.0.1:8120:8080"
+    restart: unless-stopped
